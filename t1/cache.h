@@ -11,11 +11,12 @@ Seção de declaração da estrutura de dados referente ao cache.
 ###############################################################################
 */
 
-// Thread lock 
-pthread_rwlock_t lock;
+// Thread lock global para uso no trabalho.
+extern pthread_rwlock_t lock;
 
 // Objeto de dados da estrutura de dados da cache.
 struct Dados {
+    char * body;
     char * url;
 };
 
@@ -31,8 +32,10 @@ struct NoListaCache {
 
 // Estrutura final de dados do cache.
 struct CacheFinal {
-    NoListaCache cabeca;
-    NoListaCache cauda;
+    Map<char *, NoListaCache> enderecos.
+    // ou
+    // NoListaCache cabeca;
+    // NoListaCache cauda;
     int tamanhoCache;
 };
 

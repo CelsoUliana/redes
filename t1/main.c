@@ -1,3 +1,7 @@
+/*
+**   Celso Antonio Uliana Junior,
+**   April 2019
+*/
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -7,20 +11,28 @@
 #include <netinet/in.h>
 #include <netdb.h>
 
-#define SERVER_PORT 6002
 #define MAX_PENDING 5
 #define MAX_LINE 256
 
-int main(){
+int main(int argc, char **argv){
     struct sockaddr_in sin;
     char buf[MAX_LINE];
-    int len, s, new_s;
+    int len, s, new_s, port;
 
+    if (argc != 3) {
+		fprintf(stderr, "usage: %s <port> <cache size in mB>\n", argv[0]);
+		exit(1);
+	}
+
+    //port = argv[1];
+    port = 6002;
     /* build address data structure */
     bzero((char *)&sin, sizeof(sin));
     sin.sin_family = AF_INET;
     sin.sin_addr.s_addr = INADDR_ANY;
-    sin.sin_port = htons(SERVER_PORT);
+    sin.sin_port = htons(port);
+
+    
 
     /* setup passive open */
     if ((s = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
