@@ -103,7 +103,7 @@ int encapsulaListen(int port){
 int encapsulaClienteTs(int port, char *host){
 
     int cliente;
-    struct hostent *sharedp, *unsharedp;;
+    struct hostent *sharedp;
     struct sockaddr_in serveraddr;
 
     if ((cliente = socket(AF_INET, SOCK_STREAM, 0)) < 0)
@@ -114,13 +114,12 @@ int encapsulaClienteTs(int port, char *host){
     if ((sharedp = gethostbyname(host)) == NULL)
 	    return -2; /* check h_errno for cause of error */
 
-    *unsharedp = *sharedp;
     sem_post(&mutex);
 
     bzero((char *) &serveraddr, sizeof(serveraddr));
     serveraddr.sin_family = AF_INET;
-    bcopy((char *)unsharedp->h_addr_list[0], 
-	  (char *)&serveraddr.sin_addr.s_addr, unsharedp->h_length);
+    bcopy((char *)sharedp->h_addr_list[0], 
+	  (char *)&serveraddr.sin_addr.s_addr, sharedp->h_length);
     serveraddr.sin_port = htons(port);
 
     /* Abre a conexão com o servidor */
@@ -228,17 +227,37 @@ void parseAndCache(int conexao){
     char * metodo = (char *) malloc(MAX_LINE * sizeof(char));
     char * nome = (char *) malloc(MAX_LINE * sizeof(char));
     char * restoDaRequisicao = (char *) malloc(TAMANHO_MAX * sizeof(char));
+    char * requisicao = (char *) malloc(TAMANHO_MAX * sizeof(char));
 
-    recv(conexao, buf, sizeof(buf), 0);
+    if(recv(conexao, buf, sizeof(buf), 0) < 0){
+        printf("Deu muito ruim\n");
+    }
 
-
-    /* Lê o formato de dados descrito de uma string. */
+    /* Lê a primeira linha o formato de dados descrito de uma string. */
     sscanf(buf, "%s %s %s", metodo, nome, restoDaRequisicao);
+
+    //printf("%s", buf);
+    
+    strcat(requisicao, buf);
+    
+    // Muda o HTTP 1.1 para HTTP 1.0
+    char * req;
+    if(req = strstr(requisicao, "HTTP/1.1"))
+        strncpy(req, "HTTP/1.0", strlen("HTTP/1.0"));
+
+    
+    if((req = strstr(requisicao, "Proxy-Connection: ")))
+		strncpy(req, "Proxy-Connection: close\r\n", strlen("Proxy-Connection: close\r\n"));
+	else if((req = strstr(requisicao, "Connection:")))
+		strncpy(req, "Connection: close\r\n", strlen("Connection: close\r\n"));
+	
+   
+    printf("REQUISIÇÃO = \n%s\n", requisicao);
 
     if(strcasecmp(metodo, "GET") == 0){
         printf("metodo = %s\n nome = %s\n resto = %s\n" , metodo, nome, restoDaRequisicao);
 
-        hostname = strstr(nome, "www");
+        hostname = strstr(nome, "/");
 
         if(hostname != NULL)
             printf("hostname = %s\n", hostname);
@@ -255,7 +274,7 @@ void parseAndCache(int conexao){
             hostname = (char *) strtok(hostname, ":");
         }
 
-        int conexao_server = encapsulaCliente(80, hostname);
+        int conexao_server = encapsulaClienteTs(80, hostname);
 
         rio_writen(conexao_server, (char *) "GET ", strlen("GET "));
         rio_writen(conexao_server, nome, strlen(nome));
@@ -302,8 +321,6 @@ int main(int argc, char **argv){
 
     port = atoi(argv[1]);
     cache_size = atoi(argv[2]);
-    
-    signal(SIGPIPE, SIG_IGN);
 
     s = encapsulaListen(port);
     cache = criaCache(cache_size);
