@@ -4,8 +4,8 @@
 */
 #include "cache.h"
 
-CacheFinal * criaCache(int tamanhoCache){
-    CacheFinal * cache = (CacheFinal *) malloc (sizeof(CacheFinal));
+cacheFinal * criaCache(int tamanhoCache){
+    cacheFinal * cache = (cacheFinal *) malloc (sizeof(cacheFinal));
 
     // Erro ao criar o cache.
     if(cache == NULL){
@@ -18,18 +18,51 @@ CacheFinal * criaCache(int tamanhoCache){
 
 }
 
-int adicionaNoCache(NoListaCache noCache, CacheFinal* cache){
+int adicionaNoCache(noListaCache * noCache, cacheFinal * cache){
+    
+    if(noCache == NULL)
+        return 0;
+
+    if(cache -> cabeca == NULL){
+        cache -> cabeca = noCache;
+    }
+    
+    else{
+        noListaCache * aux = cache -> cabeca;
+
+        while(aux -> direita != NULL){
+            printf("alo\n");
+            aux = aux -> direita;
+        }
+
+        noCache -> direita = aux -> direita;
+        aux -> direita = noCache;
+        noCache -> esquerda = aux;
+
+    }
+
     return 1;
 }
 
-int removeNoCache(NoListaCache* noCache, CacheFinal* cache){
-    NoListaCache* aux;
+int removeNoCache(noListaCache* noCache, cacheFinal* cache){
+    noListaCache* aux;
 
 
 
     return 1;
 }
 
-NoListaCache* achaNoCache(char *url, CacheFinal* cache){
+noListaCache* achaNoCache(char *url, cacheFinal* cache){
     return NULL;
+}
+
+void printCache(cacheFinal * cache){
+    noListaCache * aux = cache -> cabeca;
+
+    printf("Começo da lista:\n");
+
+    while(aux != NULL){
+        printf("url = %s ->  ", aux -> dados.url);
+        aux = aux -> direita;
+    }
 }

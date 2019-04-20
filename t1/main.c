@@ -8,7 +8,7 @@
 // Variavel passada no segundo argumento do listen(). 
 // Serve como quantidade maxima de requisições de conexão.
 #define MAX_PENDING 5 
-#define MAX_LINE 8192  
+#define MAX_LINE 512  
 #define TAMANHO_BUFFER 8192  
 #define TAMANHO_MAX 8192  
 
@@ -56,10 +56,17 @@ Seção de declaração de variaveis globais, como mutex e o cache.
 static sem_t mutex;
 
 /* Cache */
-CacheFinal * cache;
+cacheFinal * cache;
 
 /* Porta */
-int port;
+int portaProxy;
+int portaCliente;
+
+/* mapa de endereços do cache */
+map<string, noListaCache *> mapa;
+
+/* Iterador do mapa de endereços */
+map<string, noListaCache *>::iterator it;
 
 /*
 ###############################################################################
@@ -221,12 +228,14 @@ void * threadInit(void * cliente){
 }
 
 void parseAndCache(int conexao){
+
     char buf[TAMANHO_BUFFER];
     char * hostname;
     char * aux;
+    char * caminho = (char *) malloc(MAX_LINE * sizeof(char));
     char * metodo = (char *) malloc(MAX_LINE * sizeof(char));
     char * nome = (char *) malloc(MAX_LINE * sizeof(char));
-    char * restoDaRequisicao = (char *) malloc(TAMANHO_MAX * sizeof(char));
+    char * restoDaRequisicao = (char *) malloc(MAX_LINE * sizeof(char));
     char * requisicao = (char *) malloc(TAMANHO_MAX * sizeof(char));
 
     if(recv(conexao, buf, sizeof(buf), 0) < 0){
@@ -236,7 +245,7 @@ void parseAndCache(int conexao){
     /* Lê a primeira linha o formato de dados descrito de uma string. */
     sscanf(buf, "%s %s %s", metodo, nome, restoDaRequisicao);
 
-    //printf("%s", buf);
+    // printf("%s", buf);
     
     strcat(requisicao, buf);
     
@@ -244,12 +253,6 @@ void parseAndCache(int conexao){
     char * req;
     if(req = strstr(requisicao, "HTTP/1.1"))
         strncpy(req, "HTTP/1.0", strlen("HTTP/1.0"));
-
-    
-    if((req = strstr(requisicao, "Proxy-Connection: ")))
-		strncpy(req, "Proxy-Connection: close\r\n", strlen("Proxy-Connection: close\r\n"));
-	else if((req = strstr(requisicao, "Connection:")))
-		strncpy(req, "Connection: close\r\n", strlen("Connection: close\r\n"));
 	
    
     printf("REQUISIÇÃO = \n%s\n", requisicao);
@@ -257,16 +260,44 @@ void parseAndCache(int conexao){
     if(strcasecmp(metodo, "GET") == 0){
         printf("metodo = %s\n nome = %s\n resto = %s\n" , metodo, nome, restoDaRequisicao);
 
+        
+        portaCliente = 0;   
+
+        // Parsing.
+
+        char * aux;
+        strcpy(caminho, "/");
+
         hostname = strstr(nome, "/");
 
         if(hostname != NULL)
-            printf("hostname = %s\n", hostname);
+            printf("hostname = %s\n", hostname); 
 
 
+        // Entrando na sessão critica.
+        sem_wait(&mutex);
+        it = mapa.find(nome);
+
+        if(it == mapa.end()){
+            printf("Não tem no cache.\n");
+            noListaCache * novo = (noListaCache *) malloc(sizeof(noListaCache));
+            novo -> dados.url = nome;
+            novo -> direita = NULL;
+            novo -> esquerda = NULL;
+            adicionaNoCache(novo, cache);
+            mapa.insert(make_pair(nome, novo));
+        }
+        else{
+            printf("tem no cache, trazendo de volta.\n");
+        }
+
+        printCache(cache);
+        sem_post(&mutex);
+        // Saindo da sessão critica
 
         // Ajusta o hostname para ser apropriado na hora de abrir
         // a conexão.
-        char * aux = index(hostname,':');
+        aux = index(hostname,':');
         if(aux == NULL){
             hostname = (char *) strtok(hostname, "/");
         }
@@ -315,15 +346,17 @@ int main(int argc, char **argv){
     sem_init(&mutex, 0, 1);
 
     if (argc != 3) {
-		fprintf(stderr, "usage: %s <port> <cache size in MB>\n", argv[0]);
+		fprintf(stderr, "usage: %s <porta> <cache size in MB>\n", argv[0]);
 		exit(1);
 	}
 
-    port = atoi(argv[1]);
+    portaProxy = atoi(argv[1]);
     cache_size = atoi(argv[2]);
 
-    s = encapsulaListen(port);
+    s = encapsulaListen(portaProxy);
     cache = criaCache(cache_size);
+
+    printf("tamanho do cache = %d\n", cache -> tamanho);
 
 
     /* wait for connection, then receive and print text */

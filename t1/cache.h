@@ -25,9 +25,6 @@ Seção de declaração da estrutura de dados referente ao cache.
 ###############################################################################
 */
 
-// Thread lock global para uso no trabalho.
-extern pthread_rwlock_t lock;
-
 // Objeto de dados da estrutura de dados da cache.
 struct SDados {
     char * body;
@@ -35,31 +32,27 @@ struct SDados {
     long long int tamanhoDados;
 };
 
-typedef struct SDados Dados;
+typedef struct SDados dados;
 
 // Nó da lista duplamente encadeada que contem uma da
 // estruturas de dados da cache.
 struct SNoListaCache {
 
     // Organização da Nó da lista.
-    Dados dados;
-    Dados * direita;
-    Dados * esquerda;
+    dados dados;
+    struct SNoListaCache * direita;
+    struct SNoListaCache * esquerda;
 };
 
-typedef struct SNoListaCache NoListaCache;
+typedef struct SNoListaCache noListaCache;
 
 // Estrutura final de dados do cache.
-struct SCacheFinal {
-    map<char *, NoListaCache> enderecos;
-    // Talvez
-    // Map<char [], NoListaCache> enderecos543'wsd    // ou
-    
-    NoListaCache cabeca;
+struct SCacheFinal {   
+    noListaCache * cabeca;
     long long int tamanho;
 };
 
-typedef struct SCacheFinal CacheFinal;
+typedef struct SCacheFinal cacheFinal;
 
 /*
 ###############################################################################
@@ -68,16 +61,18 @@ Seção de funcões para funcionalidade do cache.
 */
 
 /*  Inicializa um cache com o tamanho desejado. */
-CacheFinal * criaCache(int tamanhoCache);
+cacheFinal * criaCache(int tamanhoCache);
 
 /*  Adiciona um novo nó no cache. */
-int adicionaNoCache(NoListaCache noCache, CacheFinal * cache);
+int adicionaNoCache(noListaCache * noCache, cacheFinal * cache);
 
 /*  Remove um nó no cache. */
-int removeNoCache(NoListaCache * noCache, CacheFinal * cache);
+int removeNoCache(noListaCache * noCache, cacheFinal * cache);
 
 /*  Acha um nó na lista. */
-NoListaCache * achaNoCache(char *url, CacheFinal * cache);
+noListaCache * achaNoCache(char *url, cacheFinal * cache);
 
+/* Printa a lista encadeada de nós */
+void printCache(cacheFinal * cache);
 
 #endif
