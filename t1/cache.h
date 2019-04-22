@@ -74,6 +74,9 @@ cacheFinal * criaCache(int tamanhoCache);
 /*  Adicão real do nó */
 int adicionaNoCache(noListaCache * noCache, cacheFinal * cache);
 
+/*  Adiciona um nó existente na cabeca pois foi usado recentemente */
+int AdicionaNoExistenteNaCabeca(noListaCache * noCache, cacheFinal * cache);
+
 /*  Remove um nó no cache. */
 int removeNoCache(noListaCache * noCache, cacheFinal * cache);
 

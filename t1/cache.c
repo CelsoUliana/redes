@@ -31,33 +31,52 @@ int adicionaNoCache(noListaCache * noCache, cacheFinal * cache){
     
     else{
         noCache -> direita = cache -> cabeca;
-        noCache -> esquerda = cache -> cabeca -> esquerda;
         cache -> cabeca = noCache;
     }
 
     return 1;
 }
 
+int AdicionaNoExistenteNaCabeca(noListaCache * noCache, cacheFinal * cache){
+
+    if(noCache -> direita != NULL)
+        noCache -> direita -> esquerda = noCache -> esquerda;
+
+    else
+        cache -> cauda = noCache -> esquerda;
+    
+    if(noCache -> esquerda != NULL)
+        noCache -> esquerda -> direita = noCache -> direita;
+
+    else
+        cache -> cabeca = noCache -> direita;
+
+    noCache -> esquerda = NULL;
+    noCache -> direita = cache -> cabeca;
+    cache -> cabeca = noCache;
+}
+
 int removeNoCache(noListaCache * noCache, cacheFinal * cache){
 
-    noListaCache * aux = noCache;
-
-    if(aux == NULL)
+    if(noCache == NULL)
         return 0;
 
-    if(aux -> direita != NULL)
-        aux -> direita -> esquerda = aux -> esquerda;
+    if(noCache -> direita != NULL)
+        noCache -> direita -> esquerda = noCache -> esquerda;
     
     else
-        cache -> cauda = aux -> esquerda;
+        cache -> cauda = noCache -> esquerda;
 
-    if(aux -> esquerda != NULL)
-        aux -> esquerda -> direita = aux -> direita;
+    if(noCache -> esquerda != NULL)
+        noCache -> esquerda -> direita = noCache -> direita;
 
     else
-        cache -> cabeca = aux -> direita;
+        cache -> cabeca = noCache -> direita;
 
-    free(aux);
+    
+    free(noCache);
+
+    noCache = NULL;
 
     return 1;
 }

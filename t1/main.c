@@ -9,8 +9,8 @@
     Variavel passada no segundo argumento do listen(). 
     Serve como quantidade maxima de requisições de conexão.
 */
-#define MAX_PENDING 10
-#define MAX_LINE 512  
+#define MAX_PENDING 100
+#define MAX_LINE 8192  
 #define TAMANHO_BUFFER 8192  
 #define TAMANHO_MAX 8192  
 
@@ -166,6 +166,7 @@ void * threadInit(void * cliente){
         Necessário o uso de Pthread_join().
     */
     pthread_detach(pthread_self());
+    //free(cliente);
 
     parseAndCache(conexaoCliente);
 
@@ -216,9 +217,9 @@ void parseAndCache(int conexao){
 
     char buf[TAMANHO_BUFFER];
     char * hostname;
-    char * nome = (char *) malloc(MAX_LINE * sizeof(char));
-    char * metodo = (char *) malloc(MAX_LINE * sizeof(char));
-    char * caminho = (char *) malloc(MAX_LINE * sizeof(char));
+    char * nome = (char *) malloc(TAMANHO_MAX * sizeof(char));
+    char * metodo = (char *) malloc(TAMANHO_MAX * sizeof(char));
+    char * caminho = (char *) malloc(TAMANHO_MAX * sizeof(char));
     char * requisicao = (char *) malloc(TAMANHO_MAX * sizeof(char));
 
 
@@ -281,9 +282,11 @@ void parseAndCache(int conexao){
             int conexaoServer = encapsulaClienteTs(portaCliente, hostname);
             req = strstr(requisicao, "GET");
 
-            printf("%s", req);
+            //printf("%s", req);
 
             rio_writen(conexaoServer, req, strlen(req));
+
+            req = NULL;
 
             int tam = 0, n;
 
@@ -318,6 +321,7 @@ void parseAndCache(int conexao){
                 e reinserido no começo da lista. Sendo assim para liberar espaço
                 Só é necessário ir removendo os nós caudas. 
             */
+            
             while(cache -> tamanhoAtual > cache -> tamanhoLimite){
 
                 /*  Acha a cauda pelo mapa */
@@ -328,8 +332,11 @@ void parseAndCache(int conexao){
 
                 /*  Remove do cache, e em seguida, do cache */
                 removeNoCache(cache -> cauda, cache);
-                mapa.erase(it);
+
+                if(it != mapa.end())
+                    mapa.erase(it);
             }
+            
 
             if(!adicionaNoCache(novo, cache)){
                 printf("Falha na inserção no cache.\n");
@@ -339,7 +346,7 @@ void parseAndCache(int conexao){
 
             /*  Adiciona no mapa */
             mapa.insert(make_pair(nome, novo));
-
+            //printCache(cache);
             close(conexaoServer);
         }
 
@@ -350,30 +357,35 @@ void parseAndCache(int conexao){
 
             printf("tamaho atual do cache %d\n", cache -> tamanhoAtual);
             printf("Cache hit\n");
-            printf("Url : %s\n", mapa[nome] -> dados.url);
-            rio_writen(conexao, mapa[nome] -> dados.body, mapa[nome] -> dados.tamanhoDados);
-            
+            //printCache(cache);
+
+            it = mapa.find(nome);
+
+            if(it != mapa.end()){
+                printf("Url : %s\n", mapa[nome] -> dados.url);
+                rio_writen(conexao, mapa[nome] -> dados.body, mapa[nome] -> dados.tamanhoDados);
+            }
 
             /*  
                 Remove o nó da sua posição atual e insere ele novamente
                 no começo da lista, para simbolizar que foi acessado.
                 Custo remoção O(1) e inserção O(1).
             */
-            if(!removeNoCache(mapa[nome], cache)){
-                printf("Falha na remoção de um nó no cache.\n");
-            }
 
-            if(!adicionaNoCache(mapa[nome], cache)){
-                printf("Falha na inserção no cache.\n");
-            }
+            noListaCache * aux = mapa[nome];
+
+            AdicionaNoExistenteNaCabeca(aux, cache);   
 
             sem_post(&mutexCache);
         }    
     }
-    
+
     else
         printf("Metodo não GET - Proxy só implementa metódos GET.\n");
 
+    free(metodo);
+    free(hostname);
+    free(requisicao);
 }
 
 /*
@@ -403,7 +415,6 @@ int main(int argc, char **argv){
     cache = criaCache(cacheSize);
 
     printf("tamanho do cache = %d\n", cache -> tamanhoLimite);
-
 
     /* wait for connection, then receive and print text */
     while(1) {
