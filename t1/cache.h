@@ -25,7 +25,7 @@ Seção de declaração da estrutura de dados referente ao cache.
 ###############################################################################
 */
 
-// Objeto de dados da estrutura de dados da cache.
+/*  Objeto de dados da estrutura de dados da cache. */
 struct SDados {
     char * body;
     char * url;
@@ -34,11 +34,13 @@ struct SDados {
 
 typedef struct SDados dados;
 
-// Nó da lista duplamente encadeada que contem uma da
-// estruturas de dados da cache.
+/*  
+    Nó da lista duplamente encadeada que contem uma da
+    estruturas de dados da cache.
+*/
 struct SNoListaCache {
 
-    // Organização da Nó da lista.
+    /* Organização da Nó da lista.  */
     dados dados;
     struct SNoListaCache * direita;
     struct SNoListaCache * esquerda;
@@ -46,10 +48,12 @@ struct SNoListaCache {
 
 typedef struct SNoListaCache noListaCache;
 
-// Estrutura final de dados do cache.
+/*  Estrutura final de dados do cache.   */
 struct SCacheFinal {
-    // Todo novo nó é adicionado na cabeça.
-    // Sendo assim, o nó menos usado é sempre a cauda.   
+    /*  
+        Todo novo nó é adicionado na cabeça.
+        Sendo assim, o nó menos usado é sempre a cauda.  
+    */ 
     noListaCache * cabeca;
     noListaCache * cauda;
     long long int tamanhoLimite;
@@ -67,7 +71,7 @@ Seção de funcões para funcionalidade do cache.
 /*  Inicializa um cache com o tamanho desejado. */
 cacheFinal * criaCache(int tamanhoCache);
 
-/*  Adiciona um novo nó no começo da lista encadeada do cache. */
+/*  Adicão real do nó */
 int adicionaNoCache(noListaCache * noCache, cacheFinal * cache);
 
 /*  Remove um nó no cache. */
