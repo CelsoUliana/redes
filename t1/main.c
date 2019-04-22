@@ -404,22 +404,55 @@ void parseAndCache(int conexao){
             novo -> dados.url = nome;
             novo -> direita = NULL;
             novo -> esquerda = NULL;
+
+            int conexaoServer = encapsulaClienteTs(portaCliente, hostname);
+            req = strstr(requisicao, "GET");
+
+            rio_writen(conexaoServer, req, strlen(req));
+
+            free(requisicao);
+
+            //printf("conexão servidor = %d\n", conexao_server);
+
+            int tam = 0, n;
+
+            while((n = rio_readn(conexaoServer, buf, TAMANHO_BUFFER)) > 0 ) {
+                // Alocação do tamanho do body do site.
+                novo -> dados.body = (char *) realloc(novo -> dados.body, n + n * sizeof(char));
+
+                // Copia do body do site.
+                memcpy(novo -> dados.body + tam, buf, n);
+
+                // Tamanho que irá ocupar em memoria.
+                tam += n;
+                rio_writen(conexao, buf, n);
+                bzero(buf, TAMANHO_BUFFER);
+            }
+
+            novo -> dados.tamanhoDados = tam;
+
+            cache -> tamanhoAtual += tam;
+
+            printf("cache tamanho atual %d\n", cache -> tamanhoAtual);
+
             adicionaNoCache(novo, cache);
             mapa.insert(make_pair(nome, novo));
+
+            close(conexaoServer);
         }
+
+        
         else{
             printf("Cache hit\n");
-            printf("%s\n", mapa[nome] -> dados.url);
-            removeNoCache(mapa[nome], cache);
-            mapa.erase(it);
+            rio_writen(conexao, mapa[nome] -> dados.body, mapa[nome] -> dados.tamanhoDados);
+            //printf("%s\n", mapa[nome] -> dados.url);
+            //removeNoCache(mapa[nome], cache);
+            //mapa.erase(it);
         }
 
         printCache(cache);
         sem_post(&mutexCache);
         // Saindo da sessão critica
-
-
-        int conexaoServer = encapsulaClienteTs(portaCliente, hostname);
 
         /*
         rio_writen(conexaoServer, (char *) "GET ", strlen("GET "));
@@ -427,23 +460,7 @@ void parseAndCache(int conexao){
         rio_writen(conexaoServer, (char *) " HTTP/1.0\r\n\r\n", strlen(" HTTP/1.0\r\n\r\n"));
         */
 
-        req = strstr(requisicao, "GET");
-
-        rio_writen(conexaoServer, req, strlen(req));
-
-        free(requisicao);
-
-        //printf("conexão servidor = %d\n", conexao_server);
-
-        int tam = 0, n;
-
-        while((n = rio_readn(conexaoServer, buf, TAMANHO_BUFFER)) > 0 ) {
-            tam += n;
-            rio_writen(conexao, buf, n);
-            bzero(buf, TAMANHO_BUFFER);
-        }
-
-        close(conexaoServer);
+        
 
     }
     
@@ -478,7 +495,7 @@ int main(int argc, char **argv){
     s = encapsulaListen(portaProxy);
     cache = criaCache(cacheSize);
 
-    printf("tamanho do cache = %d\n", cache -> tamanho);
+    printf("tamanho do cache = %d\n", cache -> tamanhoLimite);
 
 
     /* wait for connection, then receive and print text */

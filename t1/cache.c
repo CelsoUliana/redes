@@ -15,7 +15,8 @@ cacheFinal * criaCache(int tamanhoCache){
 
     // Converte de MB para o tamanho verdadeiro 
     
-    cache -> tamanho = tamanhoCache << 20; 
+    cache -> tamanhoLimite = tamanhoCache << 20;
+    cache -> tamanhoAtual = 0;
     cache -> cauda = cache -> cabeca = NULL;
 }
 

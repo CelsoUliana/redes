@@ -52,7 +52,8 @@ struct SCacheFinal {
     // Sendo assim, o nó menos usado é sempre a cauda.   
     noListaCache * cabeca;
     noListaCache * cauda;
-    long long int tamanho;
+    long long int tamanhoLimite;
+    long long int tamanhoAtual;
 };
 
 typedef struct SCacheFinal cacheFinal;
