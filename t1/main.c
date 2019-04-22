@@ -7,10 +7,23 @@
 
 // Variavel passada no segundo argumento do listen(). 
 // Serve como quantidade maxima de requisições de conexão.
-#define MAX_PENDING 5 
+#define MAX_PENDING 10
 #define MAX_LINE 512  
 #define TAMANHO_BUFFER 8192  
 #define TAMANHO_MAX 8192  
+
+/*
+###############################################################################
+Seção da struct do buffer do pacote RIO.
+###############################################################################
+*/
+#define RIO_BUFSIZE 8192
+typedef struct {
+    int rio_fd;                /* descriptor for this internal buf */
+    int rio_cnt;               /* unread bytes in internal buf */
+    char *rio_bufptr;          /* next unread byte in internal buf */
+    char rio_buf[RIO_BUFSIZE]; /* internal buffer */
+} rio_t;
 
 /*
 ###############################################################################
@@ -26,19 +39,19 @@ int encapsulaListen(int port);
 /*  Encapsula toda a parte de criar socket, e conexão da parte
     Cliente.
 */
-int encapsulaCliente(int port, char *host);
+int encapsulaCliente(int port, char * host);
 
-int encapsulaClienteTs(int port, char *host);
+/*  Encapsula toda a parte de criar socket, e conexão da parte
+    Cliente, porém thread safe para o método gethostbyname()
+*/
+int encapsulaClienteTs(int port, char * host);
 
 /*  Inicialização da thread, função passada para pthread_create(),
     Onde acontece o pthread_detach para que requisições 
     Simultaneas funcionem.
 */
-void *threadInit(void *cliente);
+void *threadInit(void * cliente);
 
-ssize_t rio_writen(int fd, void *usrbuf, size_t n);
-
-ssize_t rio_readn(int fd, void *usrbuf, size_t n);
 
 /*  Metodo que faz o parsing da requisicao, e busca no cache,
     Caso ache, retorna para o cliente, caso não, adiciona ao
@@ -48,24 +61,46 @@ void parseAndCache(int conexao);
 
 /*
 ###############################################################################
+Seção de declaração de métodos do pacote RIO.
+###############################################################################
+*/
+
+/*  Função de escrever dados encapsulada */
+ssize_t rio_writen(int fd, void * usrbuf, size_t n);
+
+/*  Função de ler dados encapsulada */
+ssize_t rio_readn(int fd, void * usrbuf, size_t n);
+
+/*  Função de ler dados buffered */
+ssize_t rio_readlineb(rio_t *rp, char *usrbuf, size_t maxlen);
+
+/*  Wrapper de associação de conexão com o pointer rp */
+void rio_readinitb(rio_t *rp, int fd);
+
+/*  Wrapper da função read() Unix. */
+static ssize_t rio_read(rio_t *rp, char *usrbuf, size_t n);
+
+/*
+###############################################################################
 Seção de declaração de variaveis globais, como mutex e o cache.
 ###############################################################################
 */
 
-/* Mutex */
-static sem_t mutex;
+/*  Mutex */
+static sem_t mutexCache;
+static sem_t mutexHost;
 
-/* Cache */
+/*  Cache */
 cacheFinal * cache;
 
-/* Porta */
+/*  Portas */
 int portaProxy;
 int portaCliente;
 
-/* mapa de endereços do cache */
+/*  Mapa de endereços do cache */
 map<string, noListaCache *> mapa;
 
-/* Iterador do mapa de endereços */
+/*  Iterador do mapa de endereços */
 map<string, noListaCache *>::iterator it;
 
 /*
@@ -79,26 +114,26 @@ int encapsulaListen(int port){
     struct sockaddr_in sin;
     int s;
 
-    /* Constroi estrutura de dados de endereço */
+    /*  Constroi estrutura de dados de endereço */
     bzero((char *)&sin, sizeof(sin));
     sin.sin_family = AF_INET;
     sin.sin_addr.s_addr = INADDR_ANY;
     sin.sin_port = htons(port);
 
 
-    /* Abre um socket passivo */
+    /*  Abre um socket passivo */
     if ((s = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
         perror("simplex-talk: socket");
         exit(1);
     }
 
-    /* Binda o socket a uma porta */
+    /*  Binda o socket a uma porta */
     if ((bind(s, (struct sockaddr *)&sin, sizeof(sin))) < 0) {
         perror("simplex-talk: bind");
         exit(1);
     }
     
-    /* Escuta na porta */
+    /*  Escuta na porta */
     if(listen(s, MAX_PENDING) < 0){
         perror("simplex-talk: listen");
         exit(1);
@@ -107,46 +142,16 @@ int encapsulaListen(int port){
     return s;
 }
 
-int encapsulaClienteTs(int port, char *host){
+int encapsulaCliente(int port, char * host){
 
     int cliente;
-    struct hostent *sharedp;
+    struct hostent * sharedp;
     struct sockaddr_in serveraddr;
 
     if ((cliente = socket(AF_INET, SOCK_STREAM, 0)) < 0)
 	    return -1; /* check errno for cause of error */
 
-    sem_wait(&mutex);
-    /* Abre o IP do server e a porta. */
-    if ((sharedp = gethostbyname(host)) == NULL)
-	    return -2; /* check h_errno for cause of error */
-
-    sem_post(&mutex);
-
-    bzero((char *) &serveraddr, sizeof(serveraddr));
-    serveraddr.sin_family = AF_INET;
-    bcopy((char *)sharedp->h_addr_list[0], 
-	  (char *)&serveraddr.sin_addr.s_addr, sharedp->h_length);
-    serveraddr.sin_port = htons(port);
-
-    /* Abre a conexão com o servidor */
-    if (connect(cliente, (sockaddr *) &serveraddr, sizeof(serveraddr)) < 0)
-	    return -1;
-
-    return cliente;
-
-}
-
-int encapsulaCliente(int port, char *host){
-
-    int cliente;
-    struct hostent *sharedp;
-    struct sockaddr_in serveraddr;
-
-    if ((cliente = socket(AF_INET, SOCK_STREAM, 0)) < 0)
-	    return -1; /* check errno for cause of error */
-
-    /* Abre o IP do server e a porta. */
+    /*  Abre o IP do server e a porta. */
     if ((sharedp = gethostbyname(host)) == NULL)
 	    return -2; /* check h_errno for cause of error */
 
@@ -157,7 +162,7 @@ int encapsulaCliente(int port, char *host){
 	  (char *)&serveraddr.sin_addr.s_addr, sharedp->h_length);
     serveraddr.sin_port = htons(port);
 
-    /* Abre a conexão com o servidor */
+    /*  Abre a conexão com o servidor */
     if (connect(cliente, (sockaddr *) &serveraddr, sizeof(serveraddr)) < 0)
 	    return -1;
 
@@ -165,11 +170,68 @@ int encapsulaCliente(int port, char *host){
 
 }
 
-ssize_t rio_writen(int fd, char *usrbuf, size_t n) 
-{
+int encapsulaClienteTs(int port, char * host){
+
+    int cliente;
+    struct hostent * sharedp;
+    struct sockaddr_in serveraddr;
+
+    if ((cliente = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+	    return -1; /* check errno for cause of error */
+
+    /*  Entrada da sessão critica */
+    sem_wait(&mutexHost);
+
+    /*  Abre o IP do server e a porta. */
+    if ((sharedp = gethostbyname(host)) == NULL)
+	    return -2; /* check h_errno for cause of error */
+
+    sem_post(&mutexHost);
+    /*  Saida da sessão critica  */
+
+    bzero((char *) &serveraddr, sizeof(serveraddr));
+    serveraddr.sin_family = AF_INET;
+    bcopy((char *)sharedp->h_addr_list[0], 
+	  (char *)&serveraddr.sin_addr.s_addr, sharedp->h_length);
+    serveraddr.sin_port = htons(port);
+
+    /*  Abre a conexão com o servidor */
+    if (connect(cliente, (sockaddr *) &serveraddr, sizeof(serveraddr)) < 0)
+	    return -1;
+
+    return cliente;
+
+}
+
+void * threadInit(void * cliente){
+    int conexaoCliente = *((int *) cliente);
+
+    //  Deatach, separa a thread atual da thread main, sendo assim, não é
+    //  Necessário o uso de Pthread_join().
+    pthread_detach(pthread_self());
+
+    //printf("connexão cliente num %d\n", conexao_cliente);
+
+    parseAndCache(conexaoCliente);
+
+    //recv(conexao_cliente, buf, sizeof(buf), 0);
+    //fputs(buf, stdout);
+
+    close(conexaoCliente);
+
+    return NULL;
+}
+
+void rio_readinitb(rio_t *rp, int fd){
+    rp->rio_fd = fd;  
+    rp->rio_cnt = 0;  
+    rp->rio_bufptr = rp->rio_buf;
+}
+
+ssize_t rio_writen(int fd, char * usrbuf, size_t n) {
     size_t nleft = n;
     ssize_t nwritten;
-    char *bufp =  usrbuf;
+    char * bufp =  usrbuf;
 
     while (nleft > 0) {
 	if ((nwritten = write(fd, bufp, nleft)) <= 0) {
@@ -184,11 +246,10 @@ ssize_t rio_writen(int fd, char *usrbuf, size_t n)
     return n;
 }
 
-ssize_t rio_readn(int fd, char *usrbuf, size_t n) 
-{
+ssize_t rio_readn(int fd, char * usrbuf, size_t n) {
     size_t nleft = n;
     ssize_t nread;
-    char *bufp = usrbuf;
+    char * bufp = usrbuf;
 
     while (nleft > 0) {
 	if ((nread = read(fd, bufp, nleft)) < 0) {
@@ -205,26 +266,51 @@ ssize_t rio_readn(int fd, char *usrbuf, size_t n)
     return (n - nleft);         /* return >= 0 */
 }
 
-void * threadInit(void * cliente){
-    int conexao_cliente = *((int *) cliente);
-    int len;
-    char buf[TAMANHO_BUFFER];
+ssize_t rio_readlineb(rio_t *rp, char *usrbuf, size_t maxlen) {
+    int n, rc;
+    char c, *bufp = usrbuf;
 
-    // Deatach, separa a thread atual da thread main, sendo assim, não é
-    // Necessário o uso de Pthread_join().
-    pthread_detach(pthread_self());
+    for (n = 1; n < maxlen; n++) { 
+	if ((rc = rio_read(rp, &c, 1)) == 1) {
+	    *bufp++ = c;
+	    if (c == '\n')
+		break;
+	} else if (rc == 0) {
+	    if (n == 1)
+		return 0; /* EOF, no data read */
+	    else
+		break;    /* EOF, some data was read */
+	} else
+	    return -1;	  /* error */
+    }
+    *bufp = 0;
+    return n;
+}
 
-    printf("connexão cliente num %d\n", conexao_cliente);
+static ssize_t rio_read(rio_t *rp, char *usrbuf, size_t n){
+    int cnt;
 
+    while (rp->rio_cnt <= 0) {  /* refill if buf is empty */
+	rp->rio_cnt = read(rp->rio_fd, rp->rio_buf, 
+			   sizeof(rp->rio_buf));
+	if (rp->rio_cnt < 0) {
+	    if (errno != EINTR) /* interrupted by sig handler return */
+		return -1;
+	}
+	else if (rp->rio_cnt == 0)  /* EOF */
+	    return 0;
+	else 
+	    rp->rio_bufptr = rp->rio_buf; /* reset buffer ptr */
+    }
 
-    parseAndCache(conexao_cliente);
-
-    //recv(conexao_cliente, buf, sizeof(buf), 0);
-    //fputs(buf, stdout);
-
-    close(conexao_cliente);
-
-    return NULL;
+    /* Copy min(n, rp->rio_cnt) bytes from internal buf to user buf */
+    cnt = n;          
+    if (rp->rio_cnt < n)   
+	cnt = rp->rio_cnt;
+    memcpy(usrbuf, rp->rio_bufptr, cnt);
+    rp->rio_bufptr += cnt;
+    rp->rio_cnt -= cnt;
+    return cnt;
 }
 
 void parseAndCache(int conexao){
@@ -238,9 +324,29 @@ void parseAndCache(int conexao){
     char * restoDaRequisicao = (char *) malloc(MAX_LINE * sizeof(char));
     char * requisicao = (char *) malloc(TAMANHO_MAX * sizeof(char));
 
+    /*  Declaracao dos ponteiros para utilização do pacote RIO */
+    rio_t rioServidor;
+	rio_t rioCliente;
+
+    /*
     if(recv(conexao, buf, sizeof(buf), 0) < 0){
-        printf("Deu muito ruim\n");
+        printf("Erro de leitura\n");
     }
+    */
+
+    /*
+	rio_readinitb(&rioCliente, conexao);
+
+    while(rio_readn(conexao, buf, TAMANHO_BUFFER) > 0){
+        printf("%s\n", buf);
+    }
+    */
+
+    
+    while(recv(conexao, buf, sizeof(buf), 0) < 0){
+        printf("%s\n", buf);
+    }
+    
 
     /* Lê a primeira linha o formato de dados descrito de uma string. */
     sscanf(buf, "%s %s %s", metodo, nome, restoDaRequisicao);
@@ -248,20 +354,23 @@ void parseAndCache(int conexao){
     // printf("%s", buf);
     
     strcat(requisicao, buf);
-    
-    // Muda o HTTP 1.1 para HTTP 1.0
-    char * req;
-    if(req = strstr(requisicao, "HTTP/1.1"))
-        strncpy(req, "HTTP/1.0", strlen("HTTP/1.0"));
 	
    
-    printf("REQUISIÇÃO = \n%s\n", requisicao);
+    //printf("REQUISIÇÃO = \n%s\n", requisicao);
 
     if(strcasecmp(metodo, "GET") == 0){
-        printf("metodo = %s\n nome = %s\n resto = %s\n" , metodo, nome, restoDaRequisicao);
+        //printf("metodo = %s\n nome = %s\n resto = %s\n" , metodo, nome, restoDaRequisicao);
+
+
+         // Muda o HTTP 1.1 para HTTP 1.0
+        char * req;
+        if(req = strstr(requisicao, "HTTP/1.1"))
+            strncpy(req, "HTTP/1.0", strlen("HTTP/1.0"));
+
+        strcat(requisicao, "\r\n");
 
         
-        portaCliente = 0;   
+        portaCliente = 80;   
 
         // Parsing.
 
@@ -270,30 +379,8 @@ void parseAndCache(int conexao){
 
         hostname = strstr(nome, "/");
 
-        if(hostname != NULL)
-            printf("hostname = %s\n", hostname); 
-
-
-        // Entrando na sessão critica.
-        sem_wait(&mutex);
-        it = mapa.find(nome);
-
-        if(it == mapa.end()){
-            printf("Não tem no cache.\n");
-            noListaCache * novo = (noListaCache *) malloc(sizeof(noListaCache));
-            novo -> dados.url = nome;
-            novo -> direita = NULL;
-            novo -> esquerda = NULL;
-            adicionaNoCache(novo, cache);
-            mapa.insert(make_pair(nome, novo));
-        }
-        else{
-            printf("tem no cache, trazendo de volta.\n");
-        }
-
-        printCache(cache);
-        sem_post(&mutex);
-        // Saindo da sessão critica
+        //if(hostname != NULL)
+            //printf("hostname = %s\n", hostname); 
 
         // Ajusta o hostname para ser apropriado na hora de abrir
         // a conexão.
@@ -305,24 +392,58 @@ void parseAndCache(int conexao){
             hostname = (char *) strtok(hostname, ":");
         }
 
-        int conexao_server = encapsulaClienteTs(80, hostname);
+        // Entrando na sessão critica.
+        sem_wait(&mutexCache);
+        it = mapa.find(nome);
 
-        rio_writen(conexao_server, (char *) "GET ", strlen("GET "));
-        rio_writen(conexao_server, nome, strlen(nome));
-        rio_writen(conexao_server, (char *) " HTTP/1.0\r\n\r\n", strlen(" HTTP/1.0\r\n\r\n"));
+        //printf("nome = %s\n hostname = %s\n", nome, hostname);
+
+        if(it == mapa.end()){
+            printf("Cache miss\n");
+            noListaCache * novo = (noListaCache *) malloc(sizeof(noListaCache));
+            novo -> dados.url = nome;
+            novo -> direita = NULL;
+            novo -> esquerda = NULL;
+            adicionaNoCache(novo, cache);
+            mapa.insert(make_pair(nome, novo));
+        }
+        else{
+            printf("Cache hit\n");
+            printf("%s\n", mapa[nome] -> dados.url);
+            removeNoCache(mapa[nome], cache);
+            mapa.erase(it);
+        }
+
+        printCache(cache);
+        sem_post(&mutexCache);
+        // Saindo da sessão critica
 
 
-        printf("conexão servidor = %d\n", conexao_server);
+        int conexaoServer = encapsulaClienteTs(portaCliente, hostname);
+
+        /*
+        rio_writen(conexaoServer, (char *) "GET ", strlen("GET "));
+        rio_writen(conexaoServer, nome, strlen(nome));
+        rio_writen(conexaoServer, (char *) " HTTP/1.0\r\n\r\n", strlen(" HTTP/1.0\r\n\r\n"));
+        */
+
+        req = strstr(requisicao, "GET");
+
+        rio_writen(conexaoServer, req, strlen(req));
+
+        free(requisicao);
+
+        //printf("conexão servidor = %d\n", conexao_server);
 
         int tam = 0, n;
 
-        while((n = rio_readn(conexao_server, buf, MAX_LINE)) > 0 ) {
+        while((n = rio_readn(conexaoServer, buf, TAMANHO_BUFFER)) > 0 ) {
             tam += n;
             rio_writen(conexao, buf, n);
-            bzero(buf, MAX_LINE);
+            bzero(buf, TAMANHO_BUFFER);
         }
 
-        close(conexao_server);
+        close(conexaoServer);
 
     }
     
@@ -339,11 +460,12 @@ Seção da main.
 
 int main(int argc, char **argv){
     struct sockaddr_in sin;
-    int len, s, new_s, cache_size;
+    int len, s, new_s, cacheSize;
     pthread_t tid;
 
     /* Inicia o semaforo */
-    sem_init(&mutex, 0, 1);
+    sem_init(&mutexCache, 0, 1);
+    sem_init(&mutexHost, 0, 1);
 
     if (argc != 3) {
 		fprintf(stderr, "usage: %s <porta> <cache size in MB>\n", argv[0]);
@@ -351,10 +473,10 @@ int main(int argc, char **argv){
 	}
 
     portaProxy = atoi(argv[1]);
-    cache_size = atoi(argv[2]);
+    cacheSize = atoi(argv[2]);
 
     s = encapsulaListen(portaProxy);
-    cache = criaCache(cache_size);
+    cache = criaCache(cacheSize);
 
     printf("tamanho do cache = %d\n", cache -> tamanho);
 

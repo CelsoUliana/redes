@@ -47,8 +47,11 @@ struct SNoListaCache {
 typedef struct SNoListaCache noListaCache;
 
 // Estrutura final de dados do cache.
-struct SCacheFinal {   
+struct SCacheFinal {
+    // Todo novo nó é adicionado na cabeça.
+    // Sendo assim, o nó menos usado é sempre a cauda.   
     noListaCache * cabeca;
+    noListaCache * cauda;
     long long int tamanho;
 };
 
@@ -63,16 +66,13 @@ Seção de funcões para funcionalidade do cache.
 /*  Inicializa um cache com o tamanho desejado. */
 cacheFinal * criaCache(int tamanhoCache);
 
-/*  Adiciona um novo nó no cache. */
+/*  Adiciona um novo nó no começo da lista encadeada do cache. */
 int adicionaNoCache(noListaCache * noCache, cacheFinal * cache);
 
 /*  Remove um nó no cache. */
 int removeNoCache(noListaCache * noCache, cacheFinal * cache);
 
-/*  Acha um nó na lista. */
-noListaCache * achaNoCache(char *url, cacheFinal * cache);
-
-/* Printa a lista encadeada de nós */
+/*  Printa a lista encadeada de nós */
 void printCache(cacheFinal * cache);
 
 #endif
