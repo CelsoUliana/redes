@@ -9,10 +9,20 @@
     Variavel passada no segundo argumento do listen(). 
     Serve como quantidade maxima de requisições de conexão.
 */
-#define MAX_PENDING 100
-#define MAX_LINE 8192  
+#define MAX_PENDING 10
+#define MAX_LINE 512  
 #define TAMANHO_BUFFER 8192  
 #define TAMANHO_MAX 8192  
+
+
+/*
+###############################################################################
+Seção de Wrappers de funções de memoria.
+###############################################################################
+*/
+void *Malloc(size_t size);
+
+void *Realloc(void *ptr, size_t size);
 
 /*
 ###############################################################################
@@ -65,8 +75,8 @@ Seção de declaração de variaveis globais, como mutex e o cache.
 */
 
 /*  Mutex */
-static sem_t mutexCache;
 static sem_t mutexHost;
+static sem_t mutexCache;
 
 /*  Cache */
 cacheFinal * cache;
@@ -80,6 +90,29 @@ map<string, noListaCache *> mapa;
 
 /*  Iterador do mapa de endereços */
 map<string, noListaCache *>::iterator it;
+
+/*
+###############################################################################
+Seção de Wrappers de funções de memoria.
+###############################################################################
+*/
+void *Malloc(size_t size) 
+{
+    void *p;
+
+    if ((p  = malloc(size)) == NULL)
+	    printf("Malloc error\n");
+    return p;
+}
+
+void *Realloc(void *ptr, size_t size) 
+{
+    void *p;
+
+    if ((p  = realloc(ptr, size)) == NULL)
+	    printf("Realloc error\n");
+    return p;
+}
 
 /*
 ###############################################################################
@@ -217,14 +250,14 @@ void parseAndCache(int conexao){
 
     char buf[TAMANHO_BUFFER];
     char * hostname;
-    char * nome = (char *) malloc(TAMANHO_MAX * sizeof(char));
-    char * metodo = (char *) malloc(TAMANHO_MAX * sizeof(char));
-    char * caminho = (char *) malloc(TAMANHO_MAX * sizeof(char));
-    char * requisicao = (char *) malloc(TAMANHO_MAX * sizeof(char));
+    char * nome = (char *) Malloc(TAMANHO_MAX * sizeof(char));
+    char * metodo = (char *) Malloc(TAMANHO_MAX * sizeof(char));
+    char * caminho = (char *) Malloc(TAMANHO_MAX * sizeof(char));
+    char * requisicao = (char *) Malloc(TAMANHO_MAX * sizeof(char));
 
 
     while(recv(conexao, buf, sizeof(buf), 0) < 0){
-        printf("%s\n", buf);
+        //printf("%s\n", buf);
     }
     
 
@@ -268,14 +301,17 @@ void parseAndCache(int conexao){
             hostname = (char *) strtok(hostname, ":");
         }
 
+        sem_wait(&mutexCache);
         it = mapa.find(nome);
+        sem_post(&mutexCache);
 
         if(it == mapa.end()){
 
             printf("Cache miss\n");
             printf("Url : %s\n", nome);
-            noListaCache * novo = (noListaCache *) malloc(sizeof(noListaCache));
+            noListaCache * novo = (noListaCache *) Malloc(sizeof(noListaCache));
             novo -> dados.url = nome;
+            novo -> dados.body = NULL;
             novo -> direita = NULL;
             novo -> esquerda = NULL;
 
@@ -293,7 +329,9 @@ void parseAndCache(int conexao){
             while((n = rio_readn(conexaoServer, buf, TAMANHO_BUFFER)) > 0 ) {
 
                 /*  Alocação do tamanho do body do site. */
-                novo -> dados.body = (char *) realloc(novo -> dados.body, n + n * sizeof(char));
+                novo -> dados.body = (char *) Realloc(novo -> dados.body, n + n * sizeof(char));
+
+                //printf("vou copiar os dados para o cliente\n");
 
                 /*  Copia do body do site.   */
                 memcpy(novo -> dados.body + tam, buf, n);
@@ -313,7 +351,8 @@ void parseAndCache(int conexao){
             novo -> dados.tamanhoDados = tam;
             cache -> tamanhoAtual += tam;
 
-            printf("Tamanho atual do cache %d\n", cache -> tamanhoAtual);
+            printf("Tamanho atual do cache =  %d ------ Tamanho Limite do cache = %d\n",
+             cache -> tamanhoAtual, cache -> tamanhoLimite, cache -> tamanhoLimite);
 
             /*  
                 Abre espaço necessario em cache, pois a ordem da lista encadeada
@@ -336,16 +375,15 @@ void parseAndCache(int conexao){
                 if(it != mapa.end())
                     mapa.erase(it);
             }
-            
 
             if(!adicionaNoCache(novo, cache)){
                 printf("Falha na inserção no cache.\n");
             }
 
-            sem_post(&mutexCache);
-
             /*  Adiciona no mapa */
             mapa.insert(make_pair(nome, novo));
+            
+            sem_post(&mutexCache);
             //printCache(cache);
             close(conexaoServer);
         }
@@ -355,7 +393,8 @@ void parseAndCache(int conexao){
             /*  Acesso a sessão critica     */
             sem_wait(&mutexCache);
 
-            printf("tamaho atual do cache %d\n", cache -> tamanhoAtual);
+            printf("Tamanho atual do cache =  %d ------ Tamanho Limite do cache = %d\n",
+             cache -> tamanhoAtual, cache -> tamanhoLimite);
             printf("Cache hit\n");
             //printCache(cache);
 
@@ -382,10 +421,12 @@ void parseAndCache(int conexao){
 
     else
         printf("Metodo não GET - Proxy só implementa metódos GET.\n");
-
+    
     free(metodo);
-    free(hostname);
     free(requisicao);
+
+    
+    //printCache(cache);
 }
 
 /*
@@ -399,9 +440,10 @@ int main(int argc, char **argv){
     int len, s, new_s, cacheSize;
     pthread_t tid;
 
-    /* Inicia o semaforo */
-    sem_init(&mutexCache, 0, 1);
+    /*  Inicia o semaforo */
     sem_init(&mutexHost, 0, 1);
+    sem_init(&mutexCache, 0, 1);
+
 
     if (argc != 3) {
 		fprintf(stderr, "usage: %s <porta> <cache size in MB>\n", argv[0]);
@@ -416,18 +458,20 @@ int main(int argc, char **argv){
 
     printf("tamanho do cache = %d\n", cache -> tamanhoLimite);
 
-    /* wait for connection, then receive and print text */
+    /*  wait for connection, then receive and print text */
     while(1) {
         
         if ((new_s = accept(s, (struct sockaddr *)&sin, &len)) < 0) {
             perror("simplex-talk: accept");
+            free(cache);
             exit(1);
         }
         
         else{
-            //printf("new_s = %d\n", new_s);
+            
             if (pthread_create(&tid, NULL, threadInit, &new_s) != 0) {
                 perror("pthread_create() error");
+                free(cache);
                 exit(1);
             }
         }
