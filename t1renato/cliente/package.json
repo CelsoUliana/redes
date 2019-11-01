@@ -1,0 +1,14 @@
+{
+  "name": "cliente",
+  "version": "1.0.0",
+  "description": "O cliente do trabalho de redes 1.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "author": "Celso Antonio Uliana Junior",
+  "license": "ISC",
+  "dependencies": {
+    "electron": "^7.0.1"
+  }
+}
