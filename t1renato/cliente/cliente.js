@@ -43,22 +43,9 @@
 /*
     Modulos core, fs(escrita e leitura) e net(socket).
 */
-const fs = require('fs')
 const net = require('net')
 const readline = require('readline')
-
-/*
-    Modulo para interface visual.
-*/
-const {app, BrowserWindow} = require('electron')
-
-/*
-    Constantes para comparação.
-*/
-const cp = 'cp'
-const ls = 'ls'
-const mkdir = 'mkdir'
-const rmdir = 'rmdir'
+const {initCliente, runClient} = require('../util/funcoes')
 
 /*
     Interface para leitura do terminal.   
@@ -69,65 +56,7 @@ const rl = readline.createInterface({
 })
 
 const cliente = new net.Socket()
-cliente.setKeepAlive(true)
 
-cliente.connect(1337, '127.0.0.1', () => {
-	console.log('Conexão aberta.')
-    
-    rl.on('line', linha => {
-        if(linha === 'close')
-            cliente.end()
-        
-        const palavras = linha.split(' ')
-        const comando = palavras[0]
+initCliente(cliente, rl)
 
-        if(comando === mkdir)
-            cliente.write(linha)
-        else if(comando === rmdir)
-            cliente.write(linha)
-        else if(comando === ls)
-            cliente.write(linha)
-        else if(comando === cp){
-
-            cliente.write(cp + ' ' + palavras[2])
-            const clienteArquivo = new net.Socket()
-
-            clienteArquivo.on('close', () => {
-                console.log('Transferencia Concluida.')
-            })
-
-            const arquivo = fs.readFile(palavras[1], (err, data) => {
-                if(!err){
-                    console.log('Nome arquivo: ' + palavras[2])
-                    console.log('tamanho arquivo: ' + data.length)
-                    clienteArquivo.connect(1337, '127.0.0.1', () => {
-                        clienteArquivo.write(data)
-                        clienteArquivo.end()
-                    })
-                }
-                else{
-                    console.log(err)
-                }
-            })
-        }
-
-        else{
-            cliente.write('Comando desconhecido')
-        }
-    })
-})
-
-/*
-    Função para escrever os dados recebidos do server.
-*/
-cliente.on('data', data => {
-    console.log(data.toString())
-})
-
-/*
-    Função para fechamento da cliente quando é executado o comando end().
-*/
-cliente.on('close', () => {
-    rl.close()
-	console.log('Conexão fechada')
-})
+cliente.connect(1337, '127.0.0.1', () => runClient(cliente, rl))
