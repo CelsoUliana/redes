@@ -1,13 +1,14 @@
 # redes
 
-Repositório para trabalhos da disciplina redes de computadores 2019-1, Facom.
+Repositório para trabalhos da disciplina redes de computadores, Facom.
 
 
-## T1
+## T1 Ronaldo
 
-Web caching proxy testado em windows usando cygwin.
+Webcaching proxy testado em windows usando cygwin.
 
 
 ## T2
 
-Implementação de protocolo de transferencia de arquivo usando UDP.
+Implementação de um sistema de arquivos basico por rede usando o terminal.
+Versão do node.js mínima necessária >= v12.10.0.

@@ -7,8 +7,7 @@
 */
 const fs = require('fs')
 const net = require('net')
-const {cp, ls, cd, home, mkdir, rmdir, slash} = require('../util/constantes')
-const {isArquivo, getComando, getParametro, funcMkdir, funcRmdir, initServidor} = require('../util/funcoes')
+const { initServidor} = require('../util/funcoes')
 
 /*
     Variavel que carrega o caminho do arquivo que será transferido.
@@ -17,6 +16,7 @@ var path = {link : ''}
 
 const server = net.createServer(socket => {
 
+    console.log('Servidor rodando.\n')
     /*
         Variavel global imutavel que recebe o diretorio raiz de onde o servidor está rodando.
     */
