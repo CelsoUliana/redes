@@ -18,8 +18,13 @@
             Ex 1: rmdir novaPasta/gosto/de/bolo         // Remove a pasta /bolo
             Ex 2: rmdir novaPasta                       // Equivale a rm -r -f (Cuidado!)
 
+        home:
+            home                                        // Lista os arquivos e os diretorios da pasta atual.
+
         ls:
-            ls                                          // Lista os arquivos e os diretorios da pasta atual.
+            ls <caminho(opcional)                       // Lista os arquivos da pasta do caminho inserido.
+            Ex 1: ls                                    // Lista os arquivos e pasta da raiz.
+            Ex 2: ls novaPasta                          // Lista os arquivos e pastas da novaPasta.
         
         cp:
             /// Copia o arquivo local para o host

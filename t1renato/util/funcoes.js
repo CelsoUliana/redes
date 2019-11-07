@@ -95,7 +95,7 @@ runClient = (cliente, rl) => {
         const palavras = linha.split(' ')
         const comando = palavras[0]
 
-        if(comando === mkdir || comando === rmdir || comando === ls)
+        if(comando === mkdir || comando === rmdir || comando === ls || comando === home)
             cliente.write(linha, () => {})
 
         else if(comando === cp){
@@ -111,7 +111,7 @@ runClient = (cliente, rl) => {
                     console.log('Transferencia Concluida.')
                 })
 
-                const arquivo = fs.readFile(palavras[1], (err, data) => {
+                fs.readFile(palavras[1], (err, data) => {
                     if(!err){
                         console.log('Nome arquivo: ' + palavras[2])
                         console.log('tamanho arquivo: ' + data.length)
@@ -128,6 +128,15 @@ runClient = (cliente, rl) => {
                 })
             })
         }
+    })
+}
+
+const lerDiretorio = (linha, socket) => {
+    fs.readdirSync(linha).map(nomeArquivo => {
+        if(!isArquivo(linha + slash + nomeArquivo))
+            socket.write('pasta: ' + nomeArquivo + '\n')
+        else
+            socket.write(nomeArquivo + '\n')
     })
 }
 
@@ -153,17 +162,24 @@ const initServidor = (socket, path, pacotes, globalPath) => {
             funrmdir(temp)
         }
 
-        if(command === ls){
-            console.log('modo ls:\n')
+        if(command === home){
+            console.log('modo home:\n')
             socket.write('Diretorios no host:\n')
             socket.write('-------------------\n')
         
-            fs.readdirSync(globalPath).map(nomeArquivo => {
-                if(!isArquivo(nomeArquivo))
-                    socket.write('pasta: ' + nomeArquivo + '\n')
-                else
-                    socket.write(nomeArquivo + '\n')
-            })        
+            lerDiretorio(globalPath, socket)       
+        }
+
+        else if(command === ls){
+            console.log('modo ls:\n')
+            socket.write('-------------------\n')
+            const par = getParametro(linha)
+
+            if(par === undefined || par === '' || par === null)
+                lerDiretorio(globalPath, socket)
+            else
+                lerDiretorio(globalPath + slash + par, socket)
+           
         }
 
         else if(command === cp){
