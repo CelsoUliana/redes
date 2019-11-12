@@ -15,4 +15,6 @@ rmdir (argumento caminho + nome)
 
 cp (argumento nome arquivo no cliente) (argumento nome arquivo no host)
 
+rm (argumento nome do arquivo no host)
+
 close

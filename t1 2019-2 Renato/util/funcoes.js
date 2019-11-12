@@ -8,31 +8,42 @@
 const fs = require('fs')
 const net = require('net')
 const pathResolver = require('path')
-const {slash, mkdir, rmdir, ls, cp} = require( pathResolver.resolve( __dirname, './constantes.js' ))
+const {slash, mkdir, rmdir, ls, cp, rm} = require( pathResolver.resolve( __dirname, './constantes.js' ))
 
 /*
     Função para saber se é arquivo.
 */
 const isArquivo = nomeArquivo => {
-    return fs.lstatSync(nomeArquivo).isFile()
+    try{
+        return fs.lstatSync(nomeArquivo).isFile()
+    }
+    catch(err){
+        console.log(err)
+    }
 }
 
 /*
     Função para criar um diretorio dado um caminho.
 */
 const funmkdir = string => {
-    console.log('Modo mkdir:\n')
-    console.log(string)
-    fs.mkdirSync(string, {recursive: true})
+    try{
+        fs.mkdirSync(string, {recursive: true})
+    }
+    catch(err){
+        console.log('Não foi possível criar o diretorio.')
+    }
 }
 
 /*
     Função para remover um diretorio dado um caminho.
 */
 const funrmdir = string => {
-    console.log('Modo rmdir: \n')
-    console.log(string)
-    fs.rmdirSync(string, {recursive: true})    
+    try{
+        fs.rmdirSync(string, {recursive: true})
+    }
+    catch(err){
+        console.log('Não foi possível remover o diretorio.')
+    }
 }
 
 /*
@@ -89,75 +100,79 @@ runClient = (cliente, rl, porta, ip) => {
 
     rl.on('line', linha => {
 
-        if(linha === 'close')
+        if(linha === 'close' || linha === 'exit')
             cliente.end()
         
         const palavras = linha.split(' ')
-        const comando = palavras[0]
+        const comando = getComando(linha)
 
-        if(comando === mkdir || comando === rmdir || comando === ls)
+        if(comando === mkdir || comando === rmdir || comando === ls || comando === rm)
             cliente.write(linha, () => {})
 
         else if(comando === cp){
 
-            try{
-                /*
-                    Verfica se o arquivo existe.
-                */
-                if(fs.existsSync(palavras[1])){
+            /*
+                Verfica se o arquivo existe.
+            */
+            if(fs.existsSync(palavras[1])){
                 
-                    cliente.write(cp + ' ' + palavras[2], err => {
+                /*
+                    Escreve para o servidor a intenção de mandar um arquivo.
+                */
+                cliente.write(cp + ' ' + palavras[2], err => {
 
-                        if(err)
-                            console.log(err)
+                    if(err)
+                        console.log(err)
 
-                        const clienteArquivo = new net.Socket()
+                    const clienteArquivo = new net.Socket()
 
-                        clienteArquivo.on('close', () => {
-                            console.log('Transferencia Concluida.')
-                        })
-
-                        /*
-                            Lê o arquivo de fato.
-                        */
-                        fs.readFile(palavras[1], (err, data) => {
-                            if(!err){
-                                console.log('Nome arquivo: ' + palavras[2])
-                                console.log('tamanho arquivo: ' + data.length)
-                                /*
-                                    Envia os dados.
-                                */
-                                clienteArquivo.connect(porta, ip, () => {
-                                    clienteArquivo.write(data, () => {
-                                        clienteArquivo.end()
-                                    })
-                                            
-                                })
-                            }
-                            else{
-                                console.log('Não foi possivel ler o arquivo.')
-                            }
-                        })
+                    clienteArquivo.on('close', () => {
+                        console.log('Transferencia Concluida.')
                     })
-                }
-                else{
-                    console.log('Arquivo não existe.')
-                }
+
+                    /*
+                        Lê o arquivo de fato.
+                    */
+                    fs.readFile(palavras[1], (err, data) => {
+                        if(!err){
+                            console.log('Nome arquivo: ' + palavras[2])
+                            console.log('tamanho arquivo: ' + data.length)
+                            /*
+                                Envia os dados.
+                            */
+                            clienteArquivo.connect(porta, ip, () => {
+                                clienteArquivo.write(data, () => {
+                                    clienteArquivo.end()
+                                })
+                                            
+                            })
+                        }
+                        else{
+                            console.log('Não foi possivel ler o arquivo.')
+                        }
+                    })
+                })
             }
-            catch(err){
-                console.log('Erro: ' + err) 
+            else{
+                console.log('Arquivo não existe.')
             }
         }
     })
 }
 
 const lerDiretorio = (linha, socket) => {
-    fs.readdirSync(linha).map(nomeArquivo => {
-        if(!isArquivo(linha + slash + nomeArquivo))
-            socket.write('pasta: ' + nomeArquivo + '\n')
-        else
-            socket.write(nomeArquivo + '\n')
-    })
+    try{
+        socket.write('-------------------\n')
+        fs.readdirSync(linha).map(nomeArquivo => {
+            if(!isArquivo(linha + slash + nomeArquivo))
+                socket.write('pasta: ' + nomeArquivo + '\n')
+            else
+                socket.write(nomeArquivo + '\n')
+        })
+    }
+    catch(err){
+        socket.write('Diretorio não encontrado.')
+    }
 }
 
 /*
@@ -170,21 +185,20 @@ const initServidor = (socket, path, pacotes, globalPath) => {
     socket.on('data', data => {
         
         const linha = data.toString()
-        const command = getComando(linha)
+        const comando = getComando(linha)
 
-        if(command === mkdir){
+        if(comando === mkdir){
             let temp = globalPath + slash + getParametro(linha)
             funmkdir(temp)
         }
 
-        if(command === rmdir){
+        if(comando === rmdir){
             let temp = globalPath + slash + getParametro(linha)
             funrmdir(temp)
         }
 
-        else if(command === ls){
-            console.log('modo ls:\n')
-            socket.write('-------------------\n')
+        else if(comando === ls){
+
             const par = getParametro(linha)
 
             if(par === undefined || par === '' || par === null)
@@ -194,8 +208,25 @@ const initServidor = (socket, path, pacotes, globalPath) => {
            
         }
 
-        else if(command === cp){
-            console.log('Nome arquivo:' + getParametro(linha))
+
+        else if(comando === rm){
+
+            if(fs.existsSync(globalPath + slash + getParametro(linha))){
+
+                try{
+                    fs.unlinkSync(globalPath + slash + getParametro(linha))
+                    socket.write('Arquivo ' + getParametro(linha) + ' removido com sucesso')
+                }
+                catch(err){
+                    socket.write('Houve um erro ao excluir o arquivo.')
+                }
+            }
+            else{
+                socket.write('Arquivo não foi encontrado no host.')
+            }
+        }
+
+        else if(comando === cp){
             path.link = getParametro(linha)
         }
 
@@ -205,9 +236,11 @@ const initServidor = (socket, path, pacotes, globalPath) => {
     })
 
     socket.on('end', () => {
+        
         if(path.link){
-            console.log(globalPath + slash + path.link)
+
             const arquivo = Buffer.concat(pacotes)
+
             fs.writeFile(globalPath + slash + path.link, arquivo, err => {
                 if(err){
                     console.log(err)
@@ -221,7 +254,7 @@ const initServidor = (socket, path, pacotes, globalPath) => {
             */
             path.link = ''
             pacotes = []
-    }
+        }
     })
 }
 

@@ -5,7 +5,6 @@
 /*
     Modulos core, fs(escrita e leitura) e net(socket), funções e constantes.
 */
-const fs = require('fs')
 const net = require('net')
 const { initServidor} = require('../util/funcoes')
 

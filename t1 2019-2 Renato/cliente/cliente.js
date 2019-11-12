@@ -29,6 +29,11 @@
             Ex 1: cp cliente.js cliente.js              // Copia o arquivo cliente.js como cliente.js no host
             Ex 2: cp cliente.js novapasta/cliente.js    // Copia o arquivo cliente.js como cliente.js na pasta novapasta
 
+        rm: 
+            rm <nome arquivo no host>
+            Ex 1: rm cliente.js                         // Remove o arquivo chamado cliente.js no host
+            Ex 2: rm novapasta/cliente.js               // Remove o arquivo chamado cliente.js na novapasta.
+
         close:
             close                                       // Fecha a conexão. sair da conexão sem dar close irá lançar uma exeção no host
         
