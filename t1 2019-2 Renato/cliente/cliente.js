@@ -1,11 +1,11 @@
 /*
     Prof: Renato Ishii
-    Celso Antonio Uliana Junior - October 2019
+    Celso Antonio Uliana Junior - Nov 2019
 */
 
 /*
     Usagem:
-        node cliente.js <ip> <porta>
+        node cliente.js <porta> <ip>
         Após conectar, use os comandos:
 
         mkdir:
@@ -18,11 +18,8 @@
             Ex 1: rmdir novaPasta/gosto/de/bolo         // Remove a pasta /bolo
             Ex 2: rmdir novaPasta                       // Equivale a rm -r -f (Cuidado!)
 
-        home:
-            home                                        // Lista os arquivos e os diretorios da pasta atual.
-
         ls:
-            ls <caminho(opcional)                       // Lista os arquivos da pasta do caminho inserido.
+            ls <caminho(opcional)>                      // Lista os arquivos da pasta do caminho inserido.
             Ex 1: ls                                    // Lista os arquivos e pasta da raiz.
             Ex 2: ls novaPasta                          // Lista os arquivos e pastas da novaPasta.
         
@@ -31,18 +28,10 @@
             cp <nome arquivo local> <caminho(opcional) + nome do arquivo no host>
             Ex 1: cp cliente.js cliente.js              // Copia o arquivo cliente.js como cliente.js no host
             Ex 2: cp cliente.js novapasta/cliente.js    // Copia o arquivo cliente.js como cliente.js na pasta novapasta
-        
-        rt:
-            /// Copia do host para o cliente
-            rt <nome arquivo host> <caminho(opcional) + nome arquivo local>
-            Ex 1: rt servidor.js servidor.js            // Copia o arquivo servidor.js como servidor.js no cliente
-            Ex 2: rt pasta/servidor.js servidor.js      // Copia o arquivo servidor.js na pasta como servidor.js
 
         close:
             close                                       // Fecha a conexão. sair da conexão sem dar close irá lançar uma exeção no host
-
-        qualquer outro comando irá resultar em compartamento inesperado do sistema e
-        irá causar erro.
+        
 /*
 
 /*
@@ -62,6 +51,14 @@ const rl = readline.createInterface({
 
 const cliente = new net.Socket()
 
+/*
+    Lê linha de argumentos.
+*/
+const args = process.argv.slice(2)
+
+const porta = args[0] === undefined ? '13337' : args[0]
+const ip = args[1] === undefined ? '127.0.0.1' : args[1]
+
 initCliente(cliente, rl)
 
-cliente.connect(1337, '127.0.0.1', () => runClient(cliente, rl))
+cliente.connect(porta, ip, () => runClient(cliente, rl, porta, ip))

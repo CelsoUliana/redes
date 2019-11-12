@@ -30,4 +30,12 @@ const server = net.createServer(socket => {
     initServidor(socket, path, pacotes, globalPath)
 })
 
-server.listen(1337, '127.0.0.1')
+/*
+    Lê linha de argumentos.
+*/
+const args = process.argv.slice(2)
+
+const porta = args[0] === undefined ? '13337' : args[0]
+const ip = args[1] === undefined ? '127.0.0.1' : args[1]
+
+server.listen(porta, ip)

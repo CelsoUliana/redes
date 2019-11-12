@@ -8,7 +8,7 @@
 const fs = require('fs')
 const net = require('net')
 const pathResolver = require('path')
-const {slash, mkdir, rmdir, ls, cp, cd, home} = require( pathResolver.resolve( __dirname, './constantes.js' ))
+const {slash, mkdir, rmdir, ls, cp} = require( pathResolver.resolve( __dirname, './constantes.js' ))
 
 /*
     Função para saber se é arquivo.
@@ -84,7 +84,7 @@ const initCliente = (socket, readline) => {
 /*
     Executa o cliente.
 */
-runClient = (cliente, rl) => {
+runClient = (cliente, rl, porta, ip) => {
     console.log('Conexão aberta.')
 
     rl.on('line', linha => {
@@ -95,38 +95,58 @@ runClient = (cliente, rl) => {
         const palavras = linha.split(' ')
         const comando = palavras[0]
 
-        if(comando === mkdir || comando === rmdir || comando === ls || comando === home)
+        if(comando === mkdir || comando === rmdir || comando === ls)
             cliente.write(linha, () => {})
 
         else if(comando === cp){
 
-            cliente.write(cp + ' ' + palavras[2], err => {
+            try{
+                /*
+                    Verfica se o arquivo existe.
+                */
+                if(fs.existsSync(palavras[1])){
+                
+                    cliente.write(cp + ' ' + palavras[2], err => {
 
-                if(err)
-                    console.log(err)
+                        if(err)
+                            console.log(err)
 
-                const clienteArquivo = new net.Socket()
+                        const clienteArquivo = new net.Socket()
 
-                clienteArquivo.on('close', () => {
-                    console.log('Transferencia Concluida.')
-                })
-
-                fs.readFile(palavras[1], (err, data) => {
-                    if(!err){
-                        console.log('Nome arquivo: ' + palavras[2])
-                        console.log('tamanho arquivo: ' + data.length)
-                        clienteArquivo.connect(1337, '127.0.0.1', () => {
-                            clienteArquivo.write(data, () => {
-                                clienteArquivo.end()
-                            })
-                            
+                        clienteArquivo.on('close', () => {
+                            console.log('Transferencia Concluida.')
                         })
-                    }
-                    else{
-                        console.log(err)
-                    }
-                })
-            })
+
+                        /*
+                            Lê o arquivo de fato.
+                        */
+                        fs.readFile(palavras[1], (err, data) => {
+                            if(!err){
+                                console.log('Nome arquivo: ' + palavras[2])
+                                console.log('tamanho arquivo: ' + data.length)
+                                /*
+                                    Envia os dados.
+                                */
+                                clienteArquivo.connect(porta, ip, () => {
+                                    clienteArquivo.write(data, () => {
+                                        clienteArquivo.end()
+                                    })
+                                            
+                                })
+                            }
+                            else{
+                                console.log('Não foi possivel ler o arquivo.')
+                            }
+                        })
+                    })
+                }
+                else{
+                    console.log('Arquivo não existe.')
+                }
+            }
+            catch(err){
+                console.log('Erro: ' + err) 
+            }
         }
     })
 }
@@ -160,14 +180,6 @@ const initServidor = (socket, path, pacotes, globalPath) => {
         if(command === rmdir){
             let temp = globalPath + slash + getParametro(linha)
             funrmdir(temp)
-        }
-
-        if(command === home){
-            console.log('modo home:\n')
-            socket.write('Diretorios no host:\n')
-            socket.write('-------------------\n')
-        
-            lerDiretorio(globalPath, socket)       
         }
 
         else if(command === ls){

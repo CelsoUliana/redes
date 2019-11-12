@@ -8,7 +8,7 @@ Repositório para trabalhos da disciplina redes de computadores, Facom.
 Webcaching proxy testado em windows usando cygwin.
 
 
-## T2
+## T1 Renato
 
 Implementação de um sistema de arquivos basico por rede usando o terminal.
 Versão do node.js mínima necessária >= v12.10.0.
